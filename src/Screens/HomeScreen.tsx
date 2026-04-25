@@ -86,14 +86,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setLoadingData(true);
         setLoadError(null);
         try {
+                // Quick runtime network checks to help debug RN fetch failures
+                try {
+                    const imgTestUrl = 'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/ACC%20SURAKSHA.JPG';
+                    const imgResp = await fetch(imgTestUrl, { method: 'HEAD' });
+                    // eslint-disable-next-line no-console
+                    console.log('[HomeScreen] image HEAD status', imgResp.status);
+                } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('[HomeScreen] image fetch test failed', String(err));
+                }
+
+                try {
+                    const googleResp = await fetch('https://www.google.com', { method: 'HEAD' });
+                    // eslint-disable-next-line no-console
+                    console.log('[HomeScreen] google HEAD status', googleResp.status);
+                } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('[HomeScreen] google fetch test failed', String(err));
+                }
+
             const [categoryRes, productRes] = await Promise.all([
                 supabase.from('categories').select('*').order('created_at', { ascending: true }),
                 supabase.from('products').select('*').order('created_at', { ascending: false }),
             ]);
 
-            if (categoryRes.error || productRes.error) {
-                throw categoryRes.error || productRes.error;
-            }
+                if (categoryRes.error || productRes.error) {
+                    // Log underlying supabase errors for debugging (stringify safely)
+                    const safe = (obj: any) => {
+                        try {
+                            return JSON.stringify(obj, Object.getOwnPropertyNames(obj), 2);
+                        } catch (e) {
+                            return String(obj);
+                        }
+                    };
+                    // eslint-disable-next-line no-console
+                    console.error('[HomeScreen] supabase errors:', { categoryError: safe(categoryRes.error), productError: safe(productRes.error) });
+                    throw categoryRes.error || productRes.error;
+                }
 
             const categoryRows = categoryRes.data?.length ? categoryRes.data : mockCategories;
             const productRows = productRes.data?.length ? productRes.data : mockProducts;
@@ -102,6 +132,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             setProducts(productRows);
             setIsUsingFallback(!categoryRes.data?.length || !productRes.data?.length);
         } catch (error) {
+            const safe = (obj: any) => {
+                try {
+                    return JSON.stringify(obj, Object.getOwnPropertyNames(obj), 2);
+                } catch (e) {
+                    return String(obj);
+                }
+            };
+            // eslint-disable-next-line no-console
+            console.error('[HomeScreen] loadData error:', safe(error), { message: (error as any)?.message, stack: (error as any)?.stack });
             setCategories(mockCategories);
             setProducts(mockProducts);
             setIsUsingFallback(true);
