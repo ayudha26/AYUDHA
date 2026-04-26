@@ -30,13 +30,40 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   return (
     <TouchableOpacity style={styles.container} onPress={handlePress}>
       <View style={styles.imageWrap}>
-        <ExpoImage
-          source={{ uri: getOptimizedImageUrl(product.image_url, 'card') || 'https://via.placeholder.com/150' }}
-          style={styles.image}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={120}
-        />
+        {(() => {
+          const uri = getOptimizedImageUrl(product.image_url, 'card') || 'https://via.placeholder.com/150';
+          try {
+            // Log once per product to avoid spamming Metro
+            // eslint-disable-next-line no-undef
+            if (typeof global !== 'undefined') {
+              // eslint-disable-next-line no-prototype-builtins
+              if (!global.__loggedProductImages) global.__loggedProductImages = {};
+              if (!global.__loggedProductImages[product.id]) {
+                // eslint-disable-next-line no-console
+                console.log('[ProductCard] product image uri', { id: product.id, name: product.name, uri });
+                global.__loggedProductImages[product.id] = true;
+              }
+            }
+          } catch (e) {}
+
+          return (
+            <ExpoImage
+              source={{ uri }}
+              style={styles.image}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={120}
+              onLoad={() => {
+                // eslint-disable-next-line no-console
+                console.log('[ProductCard] image loaded', { id: product.id, uri });
+              }}
+              onError={(e) => {
+                // eslint-disable-next-line no-console
+                console.error('[ProductCard] image failed', { id: product.id, uri, error: e });
+              }}
+            />
+          );
+        })()}
       </View>
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>

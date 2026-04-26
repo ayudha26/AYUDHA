@@ -24,11 +24,52 @@ const CategoryItemsScreen: React.FC<CategoryItemsProps> = ({ route, navigation }
 
     try {
       let query = supabase.from("products").select("*").order("created_at", { ascending: false });
-      
-      if (route.params.categoryIds && route.params.categoryIds.length > 0) {
-        query = query.in("category_id", route.params.categoryIds);
-      } else if (route.params.categoryId) {
-        query = query.eq("category_id", route.params.categoryId);
+
+      // Resolve category identifiers: the route may pass category IDs (uuid) or slugs/names like 'civil'.
+      const resolveCategoryIds = async () => {
+        if (route.params.categoryIds && route.params.categoryIds.length > 0) {
+          const ids: string[] = [];
+          const names: string[] = [];
+          for (const v of route.params.categoryIds) {
+            // simple UUID v4 check
+            if (/^[0-9a-fA-F-]{36}$/.test(String(v))) ids.push(String(v));
+            else names.push(String(v));
+          }
+
+          if (names.length) {
+            const { data: catRows } = await supabase
+              .from("categories")
+              .select("id,name")
+              .ilike("name", `%${names[0]}%`); // fallback: try matching by name
+            if (catRows?.length) {
+              catRows.forEach((r: any) => ids.push(r.id));
+            }
+          }
+
+          return ids;
+        }
+
+        if (route.params.categoryId) {
+          const v = String(route.params.categoryId);
+          if (/^[0-9a-fA-F-]{36}$/.test(v)) return [v];
+
+          // not a uuid — try to resolve by category name or catalog_key
+          const { data: catRows } = await supabase
+            .from("categories")
+            .select("id,name")
+            .ilike("name", `%${v}%`)
+            .limit(1);
+          if (catRows && catRows.length) return [catRows[0].id];
+          return [];
+        }
+
+        return [];
+      };
+
+      const resolved = await resolveCategoryIds();
+      if (resolved && resolved.length > 0) {
+        if (resolved.length === 1) query = query.eq("category_id", resolved[0]);
+        else query = query.in("category_id", resolved);
       }
 
       const { data, error } = await query;
@@ -39,6 +80,16 @@ const CategoryItemsScreen: React.FC<CategoryItemsProps> = ({ route, navigation }
 
       setProducts(data || []);
     } catch (error) {
+      // Log the underlying error for debugging (stringify safely)
+      const safe = (obj: any) => {
+        try {
+          return JSON.stringify(obj, Object.getOwnPropertyNames(obj), 2);
+        } catch (e) {
+          return String(obj);
+        }
+      };
+      // eslint-disable-next-line no-console
+      console.error('[CategoryItems] loadProducts error:', safe(error), { message: (error as any)?.message, stack: (error as any)?.stack });
       let fallbackRows = [];
       if (route.params.categoryIds && route.params.categoryIds.length > 0) {
         fallbackRows = mockProducts.filter((product) => route.params.categoryIds?.includes(product.category_id));

@@ -6,11 +6,12 @@ export type RootStackParamList = {
   SignUpScreen: undefined;
   HomeScreen: undefined;
   VerificationScreen: {
-    email: string;
-    password: string;
-    verificationCode: number;
+    email?: string;
+    password?: string;
+    verificationCode?: number;
     userName?: string;
     phone?: string;
+    flow?: string;
   };
   ButtonExamples: undefined;
   ChangePasswordScreen: undefined;
@@ -245,7 +246,7 @@ export interface UserProfile {
   company_name?: string;
   phone?: string;
   avatar_url?: string | null;
-  user_type: 'b2b' | 'b2c';
+  user_type?: string;
   created_at: string;
 }
 

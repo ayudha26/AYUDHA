@@ -9,7 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 type Props = NativeStackScreenProps<RootStackParamList, 'VerificationScreen'>;
 
 const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { email, password, verificationCode, userName, phone } = route.params;
+  const { phone, userName, flow } = route.params;
   const [enteredCode, setEnteredCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,46 +18,47 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
       Alert.alert('Error', 'Please enter the verification code');
       return;
     }
-    if (parseInt(enteredCode) !== verificationCode) {
-      Alert.alert('Invalid Code', 'Please enter the correct verification code.');
-      return;
-    }
     setLoading(true);
     try {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      if (signInError) {
-        throw signInError;
-      }
-      const userId = signInData.user.id;
+      // Phone flows: verify OTP with Supabase
+      if (flow === 'phone_signup' || flow === 'phone_signin') {
+        const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+          phone,
+          token: enteredCode,
+          type: 'sms',
+        });
+        if (verifyError) throw verifyError;
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(
-          {
-            user_uuid: userId,
-            user_email: email,
-            full_name: userName?.trim() || email.split('@')[0],
-            company_name: null,
-            phone: phone || null,
-            user_type: 'b2c',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_uuid' }
-        );
-      if (profileError) {
-        throw profileError;
+        const userId = verifyData?.user?.id;
+
+        if (!userId) {
+          throw new Error('Unable to verify phone number');
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(
+            {
+              user_uuid: userId,
+              user_email: verifyData?.user?.email || null,
+              full_name: userName?.trim() || null,
+              company_name: null,
+              phone: phone || null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_uuid' }
+          );
+        if (profileError) throw profileError;
+
+        navigation.navigate('HomeScreen');
+        return;
       }
-      navigation.navigate('HomeScreen');
+
+      Alert.alert('Unknown verification flow');
     } catch (error) {
       console.error('Verification error:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'An error occurred during verification'
-      );
+      Alert.alert('Error', (error as Error).message || 'An error occurred during verification');
     } finally {
       setLoading(false);
     }

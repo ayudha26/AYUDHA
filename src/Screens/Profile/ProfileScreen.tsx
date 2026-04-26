@@ -29,7 +29,7 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
   const [companyName, setCompanyName] = useState("Independent Contractor");
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userType, setUserType] = useState<"b2b" | "b2c">("b2b");
+  const [userType, setUserType] = useState<string | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [addressCount, setAddressCount] = useState(0);
@@ -40,7 +40,6 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
   const [draftName, setDraftName] = useState("");
   const [draftCompanyName, setDraftCompanyName] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
-  const [draftUserType, setDraftUserType] = useState<"b2b" | "b2c">("b2b");
 
   const loadAccountData = async () => {
     try {
@@ -67,21 +66,36 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
         throw profileError;
       }
 
+      // If profile does not exist yet, create it so user details are persisted
+      if (!profileRow) {
+        const insertPayload = {
+          user_uuid: user.id,
+          user_email: user.email || null,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
+          company_name: null,
+          phone: user.user_metadata?.phone || null,
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const { error: insertError } = await supabase.from('profiles').insert(insertPayload);
+        if (insertError) {
+          console.warn('Could not create profile row:', insertError);
+        }
+      }
+
       const nextName = profileRow?.full_name || user.email?.split("@")[0] || "AYUDHA User";
       const nextCompany = profileRow?.company_name || "Independent Contractor";
       const nextPhone = profileRow?.phone || "";
-      const nextUserType = profileRow?.user_type === "b2c" ? "b2c" : "b2b";
-
       setName(nextName);
       setCompanyName(nextCompany);
       setPhone(nextPhone);
       setAvatarUrl(profileRow?.avatar_url || null);
-      setUserType(nextUserType);
+      setUserType(profileRow?.user_type || null);
 
       setDraftName(nextName);
       setDraftCompanyName(nextCompany);
       setDraftPhone(nextPhone);
-      setDraftUserType(nextUserType);
 
       const [{ count: addressesExact }, { count: wishlistExact }] = await Promise.all([
         supabase.from("addresses").select("*", { count: "exact", head: true }).eq("user_id", user.id),
@@ -124,7 +138,6 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
         company_name: draftCompanyName.trim() || null,
         phone: draftPhone.trim() || null,
         avatar_url: avatarUrl,
-        user_type: draftUserType,
         updated_at: new Date().toISOString(),
       };
 
@@ -137,7 +150,6 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
       setName(payload.full_name);
       setCompanyName(payload.company_name || "Independent Contractor");
       setPhone(payload.phone || "");
-      setUserType(payload.user_type);
       setEditVisible(false);
       Alert.alert("Saved", "Your account details have been updated.");
     } catch (error) {
@@ -247,9 +259,6 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
             <Text style={styles.userName}>{name}</Text>
             <Text style={styles.memberSince}>{memberSubtitle}</Text>
             <View style={styles.chipRow}>
-              <View style={styles.chipOrange}>
-                <Text style={styles.chipOrangeText}>{userType === "b2b" ? "CONTRACTOR" : "CUSTOMER"}</Text>
-              </View>
               <View style={styles.chipBlue}><Text style={styles.chipBlueText}>VERIFIED</Text></View>
             </View>
             <TouchableOpacity style={styles.editProfileBtn} onPress={() => setEditVisible(true)}>
@@ -338,19 +347,7 @@ const ProfileScreen: React.FC<ProfileProps> = ({ navigation }) => {
               placeholderTextColor={groceryTheme.colors.textMuted}
             />
 
-            <View style={styles.typeRow}>
-              {(["b2b", "b2c"] as const).map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[styles.typeChip, draftUserType === type ? styles.typeChipActive : null]}
-                  onPress={() => setDraftUserType(type)}
-                >
-                  <Text style={[styles.typeChipText, draftUserType === type ? styles.typeChipTextActive : null]}>
-                    {type.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Removed b2b/b2c type selection — simple single user type now */}
 
             <TouchableOpacity style={styles.primaryBtn} onPress={saveProfile} disabled={saving}>
               <Text style={styles.primaryBtnText}>{saving ? "Saving..." : "Save Changes"}</Text>

@@ -14,8 +14,10 @@ const SignInScreen = ({ navigation }) => {
     defaultValues: {
       email: '',
       password: '',
+      phone: '',
     }
   });
+  const [method, setMethod] = useState<'email' | 'phone'>('email');
   
   const [loading, setLoading] = useState(false);
 
@@ -30,23 +32,44 @@ const SignInScreen = ({ navigation }) => {
 
   const sendDataToSupabase = async (data: FormData) => {
     setLoading(true);
-    const { email, password } = data;
-    const { error } = await supabase.auth.signInWithPassword({
+    try {
+      const { email, password, phone } = data;
+
+      if (phone && phone.trim().length > 0 && (!email || email.trim().length === 0)) {
+        // Phone-only sign in: send OTP
+        const { error } = await supabase.auth.signInWithOtp({ phone });
+        if (error) throw error;
+        navigation.navigate('VerificationScreen', { phone, flow: 'phone_signin' });
+        setLoading(false);
+        return;
+      }
+
+      // Default: email + password sign in
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-    });
-    if (error) {
-      Alert.alert(error.message);
-      setLoading(false);
-    } else {
-      console.log('Sign in successful', data);
-      AsyncStorage.setItem('userUuid', (await supabase.auth.getUser()).data.user.id || '');
+      });
+      if (error) throw error;
+
+      const userResp = await supabase.auth.getUser();
+      const userId = userResp.data.user?.id || '';
+      AsyncStorage.setItem('userUuid', userId);
       navigation.replace('HomeScreen');
+    } catch (error) {
+      Alert.alert((error as Error).message);
+    } finally {
       setLoading(false);
     }
   };
 
   const formFields: FormField[] = [
+    {
+      name: 'phone',
+      label: 'Phone',
+      placeholder: '+91 98765 43210',
+      rules: { required: false },
+      keyboardType: 'phone-pad',
+    },
     {
       name: 'email',
       label: 'Email',
@@ -88,9 +111,18 @@ const SignInScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           <ScreenHeader title="Sign In" onBack={handleBack} />
+          <View style={styles.methodRow}>
+            <TouchableOpacity onPress={() => setMethod('email')} style={[styles.methodBtn, method === 'email' && styles.methodBtnActive]}>
+              <Text style={[styles.methodText, method === 'email' && styles.methodTextActive]}>Email</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMethod('phone')} style={[styles.methodBtn, method === 'phone' && styles.methodBtnActive]}>
+              <Text style={[styles.methodText, method === 'phone' && styles.methodTextActive]}>Phone</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.formWrap}>
             <CustomForm
-              fields={formFields}
+              fields={formFields.filter(f => (method === 'email' ? f.name !== 'phone' : f.name === 'phone'))}
               control={control}
               onSubmit={handleSubmit(sendDataToSupabase)}
               submitButtonText={loading ? "Signing in..." : "Sign In"}
@@ -139,6 +171,30 @@ const styles = StyleSheet.create({
   smallTextBlue: {
     color: groceryTheme.colors.brandDark,
     textDecorationLine: 'underline',
+  },
+  methodRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  methodBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: groceryTheme.radius.md,
+    backgroundColor: groceryTheme.colors.surfaceContainerHighest,
+    alignItems: 'center',
+  },
+  methodBtnActive: {
+    backgroundColor: groceryTheme.colors.primary,
+  },
+  methodText: {
+    color: groceryTheme.colors.textSecondary,
+    fontSize: 14,
+  },
+  methodTextActive: {
+    color: groceryTheme.colors.onPrimary,
+    fontWeight: '700',
   },
   header: {
     fontSize: 20,

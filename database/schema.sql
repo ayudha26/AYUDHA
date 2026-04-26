@@ -13,7 +13,7 @@ create table if not exists profiles (
   company_name text,
   phone text,
   avatar_url text,
-  user_type text check (user_type in ('b2b', 'b2c')) default 'b2c',
+  user_type text default 'customer',
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
