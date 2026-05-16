@@ -3,6 +3,7 @@ import { CartItem, Product } from '@src/Types/types';
 import supabase from '@config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { mockProducts } from '@src/Utils/mockData';
+import { Session } from '@supabase/supabase-js';
 
 const GUEST_CART_STORAGE_KEY = 'tooldrop_guest_cart_v1';
 
@@ -82,6 +83,65 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         productMap.get(item.product_id) ||
         mockProducts.find((product) => product.id === item.product_id),
     }));
+  };
+
+  const migrateGuestCartToUser = async (userId: string) => {
+    const guestItems = await loadGuestCart();
+
+    if (!guestItems.length) {
+      return;
+    }
+
+    const { data: existingItems, error: existingError } = await supabase
+      .from('cart_items')
+      .select('id, product_id, quantity')
+      .eq('user_id', userId);
+
+    if (existingError) {
+      throw existingError;
+    }
+
+    const existingMap = new Map(
+      (existingItems || []).map((item) => [item.product_id, item])
+    );
+
+    const updates = guestItems
+      .filter((item) => existingMap.has(item.product_id))
+      .map((item) => ({
+        id: existingMap.get(item.product_id)!.id,
+        quantity: existingMap.get(item.product_id)!.quantity + item.quantity,
+        updated_at: new Date().toISOString(),
+      }));
+
+    const inserts = guestItems
+      .filter((item) => !existingMap.has(item.product_id))
+      .map((item) => ({
+        user_id: userId,
+        product_id: item.product_id,
+        quantity: item.quantity,
+      }));
+
+    if (updates.length) {
+      const { error: updateError } = await supabase
+        .from('cart_items')
+        .upsert(updates, { onConflict: 'id' });
+
+      if (updateError) {
+        throw updateError;
+      }
+    }
+
+    if (inserts.length) {
+      const { error: insertError } = await supabase
+        .from('cart_items')
+        .insert(inserts);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    await AsyncStorage.removeItem(GUEST_CART_STORAGE_KEY);
   };
 
   const fetchCartItems = async () => {
@@ -283,8 +343,17 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     fetchCartItems();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      fetchCartItems();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session: Session | null) => {
+      try {
+        if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          await migrateGuestCartToUser(session.user.id);
+        }
+      } catch (migrationError) {
+        console.error('Error migrating guest cart:', migrationError);
+        setError('Could not sync your saved cart to your account.');
+      } finally {
+        fetchCartItems();
+      }
     });
 
     return () => {

@@ -6,7 +6,7 @@ import supabase, { isSupabaseConfigured } from "@config/supabase";
 import { useCart } from "@context/CartContext";
 import { Address, CartProps } from "@src/Types/types";
 import { groceryTheme } from "@src/Utils/groceryTheme";
-import { mockAddresses, mockProducts } from "@src/Utils/mockData";
+import { mockProducts } from "@src/Utils/mockData";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -30,15 +30,15 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
     clearError,
   } = useCart();
   const [placingOrder, setPlacingOrder] = useState(false);
-  const [addresses, setAddresses] = useState<Address[]>(mockAddresses);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(
-    route.params?.selectedAddressId || mockAddresses[0].id
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | undefined>(
+    route.params?.selectedAddressId
   );
   const [addressNotice, setAddressNotice] = useState<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
-
-  const discount = cartTotal > 20 ? 2 : 0;
-  const grandTotal = Math.max(0, cartTotal - discount);
+  const deliveryFee = 60;
+  const gstAmount = cartTotal * 0.18;
+  const totalPayable = cartTotal + deliveryFee + gstAmount;
 
   const suggestedProducts = useMemo(() => mockProducts.slice(0, 3), []);
   const selectedAddress = useMemo(
@@ -61,10 +61,8 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
 
         if (!user) {
           setIsSignedIn(false);
-          setAddresses(mockAddresses);
-          if (!route.params?.selectedAddressId) {
-            setSelectedAddressId(mockAddresses[0].id);
-          }
+          setAddresses([]);
+          setSelectedAddressId(undefined);
           setAddressNotice("Guest mode: sign in when you are ready to place your order.");
           return;
         }
@@ -85,16 +83,14 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
             setSelectedAddressId(defaultAddress.id);
           }
         } else {
-          setAddresses(mockAddresses);
-          if (!route.params?.selectedAddressId) {
-            setSelectedAddressId(mockAddresses[0].id);
-          }
-          setAddressNotice("No saved addresses found yet. Add one after sign-in.");
+          setAddresses([]);
+          setSelectedAddressId(undefined);
+          setAddressNotice("No saved addresses found yet. Add one before placing your order.");
         }
       } catch (error) {
-        setIsSignedIn(false);
-        setAddresses(mockAddresses);
-        setAddressNotice("Address sync failed. Using fallback delivery location.");
+        setAddresses([]);
+        setSelectedAddressId(undefined);
+        setAddressNotice("Address sync failed. Please refresh and try again.");
       }
     };
 
@@ -116,7 +112,10 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
     }
 
     if (!selectedAddress) {
-      Alert.alert("Missing address", "Please select a delivery address before placing your order.");
+      Alert.alert("Missing address", "Please add and select a delivery address before placing your order.", [
+        { text: "Not now", style: "cancel" },
+        { text: "Manage Addresses", onPress: () => navigation.navigate("AddressManagement") },
+      ]);
       return;
     }
 
@@ -141,7 +140,7 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
         .insert({
           user_id: user.id,
           status: "confirmed",
-          total: grandTotal,
+          total: totalPayable,
           delivery_address: deliveryAddress,
           delivery_date: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         })
@@ -204,6 +203,20 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
           />
         ))}
 
+        {isSignedIn ? (
+          <TouchableOpacity style={styles.addressCta} onPress={() => navigation.navigate("AddressManagement", { selectedAddressId })}>
+            <Text style={styles.addressCtaLabel}>DELIVERY ADDRESS</Text>
+            <Text style={styles.addressCtaTitle}>
+              {selectedAddress ? selectedAddress.name : "Add a delivery address"}
+            </Text>
+            <Text style={styles.addressCtaText}>
+              {selectedAddress
+                ? `${selectedAddress.street}, ${selectedAddress.city}, ${selectedAddress.state} ${selectedAddress.zip_code}`
+                : "You need one saved address in Supabase before placing an order."}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         <Text style={styles.sectionTitle}>FREQUENTLY BOUGHT TOGETHER</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestScroll}>
           {suggestedProducts.map((product) => (
@@ -228,16 +241,16 @@ const CartScreen: React.FC<CartProps> = ({ navigation, route }) => {
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Estimated Delivery</Text>
-            <Text style={styles.totalValue}>₹60.00</Text>
+            <Text style={styles.totalValue}>₹{deliveryFee.toFixed(2)}</Text>
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Tax (GST 18%)</Text>
-            <Text style={styles.totalValue}>₹{(cartTotal * 0.18).toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₹{gstAmount.toFixed(2)}</Text>
           </View>
 
           <View style={styles.grandRow}>
             <Text style={styles.grandLabel}>TOTAL PAYABLE</Text>
-            <Text style={styles.grandValue}>₹{(cartTotal + 60 + cartTotal * 0.18).toFixed(2)}</Text>
+            <Text style={styles.grandValue}>₹{totalPayable.toFixed(2)}</Text>
           </View>
 
           <TouchableOpacity
@@ -308,6 +321,28 @@ const styles = StyleSheet.create({
     color: groceryTheme.colors.textSecondary,
     letterSpacing: 2,
     textTransform: "uppercase",
+  },
+  addressCta: {
+    backgroundColor: groceryTheme.colors.surfaceContainerLowest,
+    borderRadius: groceryTheme.radius.xl,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  addressCtaLabel: {
+    ...groceryTheme.typography.caption,
+    color: groceryTheme.colors.textSecondary,
+    letterSpacing: 1.4,
+    marginBottom: 8,
+  },
+  addressCtaTitle: {
+    ...groceryTheme.typography.title,
+    color: groceryTheme.colors.textPrimary,
+    marginBottom: 6,
+  },
+  addressCtaText: {
+    ...groceryTheme.typography.body,
+    color: groceryTheme.colors.textSecondary,
   },
   suggestScroll: {
     marginBottom: 32,

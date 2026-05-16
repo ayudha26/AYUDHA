@@ -3,9 +3,8 @@ import DataStateNotice from "@components/Feedback/DataStateNotice";
 import BottomNavBar from "@components/Layouts/BottomNavBar";
 import ScreenContainer from "@components/Layouts/ScreenContainer";
 import supabase, { isSupabaseConfigured } from "@config/supabase";
-import { Order, OrdersProps } from "@src/Types/types";
+import { Order, OrderItem, OrdersProps } from "@src/Types/types";
 import { groceryTheme } from "@src/Utils/groceryTheme";
-import { mockProducts } from "@src/Utils/mockData";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -17,10 +16,20 @@ import {
 } from "react-native";
 
 type TabType = "previous" | "upcoming";
+type OrderWithItems = Order & {
+  order_items?: (OrderItem & {
+    product?: {
+      id: string;
+      name: string;
+      image_url: string;
+      unit: string;
+    } | null;
+  })[];
+};
 
 const OrdersScreen: React.FC<OrdersProps> = ({ navigation }) => {
   const [tab, setTab] = useState<TabType>("upcoming");
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -50,7 +59,18 @@ const OrdersScreen: React.FC<OrdersProps> = ({ navigation }) => {
 
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select(`
+          *,
+          order_items (
+            *,
+            product:products (
+              id,
+              name,
+              image_url,
+              unit
+            )
+          )
+        `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -123,13 +143,21 @@ const OrdersScreen: React.FC<OrdersProps> = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? <Text style={styles.loadingText}>Refreshing orders...</Text> : null}
         {filteredOrders.map((order) => {
-          // Select a stable product mockup for this order
-          const displayProduct = mockProducts[order.id.charCodeAt(0) % mockProducts.length];
+          const displayItem = order.order_items?.[0];
+          const displayProduct = displayItem?.product;
           const isUpcoming = tab === "upcoming";
+          const totalItems = order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+          const deliveryLabel = new Date(order.delivery_date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }).toUpperCase();
 
           return (
             <View key={order.id} style={styles.orderCard}>
-              <Image source={{ uri: displayProduct.image_url }} style={styles.heroImage} />
+              <Image
+                source={{ uri: displayProduct?.image_url || "https://via.placeholder.com/480x320?text=Order" }}
+                style={styles.heroImage}
+              />
               
               <View style={styles.cardContent}>
                 <View style={styles.infoRow}>
@@ -139,13 +167,18 @@ const OrdersScreen: React.FC<OrdersProps> = ({ navigation }) => {
                         {getStatusLabel(order.status).toUpperCase()}
                       </Text>
                     </View>
-                    <Text style={styles.productName} numberOfLines={2}>{displayProduct.name}</Text>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {displayProduct?.name || "Order Items"}
+                    </Text>
+                    <Text style={styles.orderIdText}>
+                      {totalItems} item{totalItems === 1 ? "" : "s"} in this order
+                    </Text>
                     <Text style={styles.orderIdText}>Order ID: #{order.id}</Text>
                   </View>
                   <View style={styles.rightInfo}>
                     <Text style={styles.priceText}>₹{Number(order.total).toLocaleString('en-IN')}</Text>
                     <Text style={styles.expectedText}>
-                      {isUpcoming ? "EXPECTED\nTOMORROW" : "COMPLETED"}
+                      {isUpcoming ? `DELIVERS\n${deliveryLabel}` : "COMPLETED"}
                     </Text>
                   </View>
                 </View>
@@ -275,7 +308,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   tabTextActive: {
-    color: groceryTheme.colors.onPrimary,
+    color: groceryTheme.colors.inverse,
   },
   content: {
     paddingHorizontal: 16,
@@ -382,7 +415,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     ...groceryTheme.typography.labelMd,
-    color: groceryTheme.colors.onPrimary,
+    color: groceryTheme.colors.inverse,
     letterSpacing: 1,
   },
   promoBanner: {

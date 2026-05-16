@@ -2,6 +2,7 @@ import Button from '@components/Buttons/Button';
 import supabase from '@config/supabase';
 import { RootStackParamList } from '@src/Types/types';
 import { groceryTheme } from '@src/Utils/groceryTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import { Alert, SafeAreaView, Text, StyleSheet, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -12,6 +13,28 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
   const { phone, userName, flow } = route.params;
   const [enteredCode, setEnteredCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const isPhoneFlow = flow === 'phone_signup' || flow === 'phone_signin';
+
+  const handleResendCode = async () => {
+    if (!isPhoneFlow) {
+      Alert.alert('Error', 'Resend is only available for phone verification.');
+      return;
+    }
+
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone });
+      if (error) throw error;
+
+      Alert.alert('OTP sent', `A new verification code has been sent to ${phone}.`);
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      Alert.alert('Error', (error as Error).message || 'Could not resend the verification code.');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleVerification = async () => {
     if (!enteredCode) {
@@ -21,10 +44,10 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
     setLoading(true);
     try {
       // Phone flows: verify OTP with Supabase
-      if (flow === 'phone_signup' || flow === 'phone_signin') {
+      if (isPhoneFlow) {
         const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
           phone,
-          token: enteredCode,
+          token: enteredCode.trim(),
           type: 'sms',
         });
         if (verifyError) throw verifyError;
@@ -51,7 +74,8 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
           );
         if (profileError) throw profileError;
 
-        navigation.navigate('HomeScreen');
+        await AsyncStorage.setItem('userUuid', userId);
+        navigation.replace('HomeScreen');
         return;
       }
 
@@ -67,9 +91,11 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Email Verification</Text>
+        <Text style={styles.title}>{isPhoneFlow ? 'Phone Verification' : 'Verification'}</Text>
         <Text style={styles.subtitle}>
-          Enter the 4-digit code sent to {email}
+          {isPhoneFlow
+            ? `Enter the verification code sent to ${phone}`
+            : 'Enter the verification code you received.'}
         </Text>
         
         <TextInput
@@ -77,7 +103,7 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
           onChangeText={setEnteredCode}
           keyboardType="numeric"
           style={styles.input}
-          maxLength={4}
+          maxLength={6}
           placeholder="Enter verification code"
           editable={!loading}
         />
@@ -88,6 +114,16 @@ const VerificationScreen: React.FC<Props> = ({ route, navigation }) => {
           disabled={loading || !enteredCode}
           containerStyle={styles.button}
         />
+
+        {isPhoneFlow ? (
+          <Button
+            title={resending ? "Sending..." : "Resend Code"}
+            onPress={handleResendCode}
+            disabled={loading || resending}
+            variant="outline"
+            containerStyle={styles.secondaryButton}
+          />
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -129,7 +165,10 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 16,
-  }
+  },
+  secondaryButton: {
+    marginTop: 12,
+  },
 });
 
 export default VerificationScreen;
