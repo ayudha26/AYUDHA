@@ -6,12 +6,9 @@ export type RootStackParamList = {
   SignUpScreen: undefined;
   HomeScreen: undefined;
   VerificationScreen: {
-    email?: string;
-    password?: string;
-    verificationCode?: number;
     userName?: string;
-    phone?: string;
-    flow?: string;
+    phone: string;
+    flow: 'phone_signup' | 'phone_signin';
   };
   ButtonExamples: undefined;
   ChangePasswordScreen: undefined;
@@ -79,9 +76,7 @@ export interface ForgotPasswordForm {
 }
 
 export type SplashScreenProps = {
-  navigation: {
-    replace: (screen: string) => void;
-  };
+  navigation: NativeStackNavigationProp<RootStackParamList, 'SplashScreen'>;
 };
 
 
