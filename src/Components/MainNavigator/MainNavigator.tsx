@@ -14,6 +14,7 @@ import CategoryItemsScreen from "@screens/ProductCatalog/CategoryItemsScreen";
 import ProductDetailScreen from "@screens/ProductDetail/ProductDetailScreen";
 import CartScreen from "@screens/Cart/CartScreen";
 import OrdersScreen from "@screens/Orders/OrdersScreen";
+import OrderDetailScreen from "@screens/Orders/OrderDetailScreen";
 import ProfileScreen from "@screens/Profile/ProfileScreen";
 import AddressManagementScreen from "@screens/AddressManagement/AddressManagementScreen";
 import WishlistScreen from "@screens/Wishlist/WishlistScreen";
@@ -45,6 +46,7 @@ const MainNavigator = () => {
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
         <Stack.Screen name="Orders" component={OrdersScreen} />
+        <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Wishlist" component={WishlistScreen} />
         <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />

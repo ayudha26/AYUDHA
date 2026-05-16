@@ -210,6 +210,7 @@ export interface Order {
   delivery_address: string;
   delivery_date: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface OrderItem {
@@ -219,6 +220,7 @@ export interface OrderItem {
   quantity: number;
   price_at_purchase: number;
   product?: Product;
+  created_at?: string;
 }
 
 export interface Address {
@@ -236,7 +238,7 @@ export interface Address {
 export interface UserProfile {
   id: string;
   user_uuid: string;
-  user_email: string;
+  user_email?: string | null;
   full_name?: string | null;
   company_name?: string;
   phone?: string;

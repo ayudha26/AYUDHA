@@ -3,7 +3,6 @@ import DataStateNotice from "@components/Feedback/DataStateNotice";
 import supabase from "@config/supabase";
 import { Address, AddressManagementProps } from "@src/Types/types";
 import { groceryTheme } from "@src/Utils/groceryTheme";
-import { mockAddresses } from "@src/Utils/mockData";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -55,8 +54,8 @@ const AddressManagementScreen: React.FC<AddressManagementProps> = ({ navigation,
 
       if (!user) {
         setUserId(null);
-        setAddresses(mockAddresses);
-        setSelectedId(route.params?.selectedAddressId || mockAddresses[0].id);
+        setAddresses([]);
+        setSelectedId(null);
         setNotice("Sign in to manage saved delivery addresses.");
         return;
       }
@@ -80,9 +79,9 @@ const AddressManagementScreen: React.FC<AddressManagementProps> = ({ navigation,
       const defaultAddress = rows.find((row) => row.is_default);
       setSelectedId(selectedAddress?.id || defaultAddress?.id || rows[0]?.id || null);
     } catch (error) {
-      setAddresses(mockAddresses);
-      setSelectedId(route.params?.selectedAddressId || mockAddresses[0].id);
-      setNotice("Could not sync addresses. Showing fallback delivery sites.");
+      setAddresses([]);
+      setSelectedId(null);
+      setNotice("Could not sync addresses from Supabase right now.");
     }
   };
 
