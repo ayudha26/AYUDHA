@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, SafeAreaView, Alert, View, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { FormData } from '../Types/types';
-import supabase from '@config/supabase';
+import supabase, { isSupabaseConfigured } from '@config/supabase';
 import { groceryTheme } from '@src/Utils/groceryTheme';
 import ScreenHeader from '@components/Layouts/ScreenHeader';
 
@@ -12,13 +12,10 @@ const SignUpScreen = ({ navigation }) => {
     defaultValues: {
       userName: '',
       phone: '',
-      email: '',
-      password: '',
     },
   });
 
   const [loading, setLoading] = useState(false);
-  const [method, setMethod] = useState<'email' | 'phone'>('email');
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -32,45 +29,30 @@ const SignUpScreen = ({ navigation }) => {
   const handleFormSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const phoneProvided = data.phone && data.phone.trim().length > 0;
-      const emailProvided = data.email && data.email.trim().length > 0;
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to continue.');
+      }
 
-      if (method === 'phone') {
-        if (!phoneProvided) {
-          Alert.alert('Phone required', 'Please enter your phone number to sign up with SMS.');
-          return;
-        }
-        const { data: otpData, error: otpError } = await supabase.auth.signInWithOtp({ phone: data.phone });
-        if (otpError) throw otpError;
-        navigation.navigate('VerificationScreen', {
-          phone: data.phone,
-          userName: data.userName,
-          flow: 'phone_signup',
-        });
+      const userName = data.userName?.trim();
+      const phone = data.phone?.trim();
+
+      if (!userName) {
+        Alert.alert('Name required', 'Please enter your name to create your account.');
         return;
       }
 
-      // email method (use Supabase magic link / confirmation email)
-      if (method === 'email') {
-        if (!emailProvided || !data.password) {
-          Alert.alert('Email required', 'Please provide email and password to sign up.');
-          return;
-        }
-        const { error } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.userName,
-              phone: data.phone || null,
-            },
-          },
-        });
-        if (error) throw error;
-        Alert.alert('Check your email', 'A confirmation link has been sent. Please confirm your email before signing in.');
-        navigation.navigate('SignInScreen');
+      if (!phone) {
+        Alert.alert('Phone required', 'Please enter your phone number to sign up with SMS.');
         return;
       }
+
+      const { error: otpError } = await supabase.auth.signInWithOtp({ phone });
+      if (otpError) throw otpError;
+      navigation.navigate('VerificationScreen', {
+        phone,
+        userName,
+        flow: 'phone_signup',
+      });
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     } finally {
@@ -95,17 +77,8 @@ const SignUpScreen = ({ navigation }) => {
           <View style={styles.headerBlock}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
-              Enter your details to start sourcing professional equipment.
+              Enter your details and we&apos;ll send a one-time code to verify your phone number.
             </Text>
-          </View>
-
-          <View style={{flexDirection: 'row', gap: 8, marginBottom: 12}}>
-            <TouchableOpacity onPress={() => setMethod('email')} style={[styles.methodBtn, method === 'email' && styles.methodBtnActive]}>
-              <Text style={[styles.methodText, method === 'email' && styles.methodTextActive]}>Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setMethod('phone')} style={[styles.methodBtn, method === 'phone' && styles.methodBtnActive]}>
-              <Text style={[styles.methodText, method === 'phone' && styles.methodTextActive]}>Phone</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.fieldBlock}>
@@ -124,6 +97,7 @@ const SignUpScreen = ({ navigation }) => {
                     placeholder="Enter your name"
                     placeholderTextColor="#A9A9A9"
                     autoCapitalize="words"
+                    autoComplete="name"
                   />
                   {error && <Text style={styles.errorText}>{error.message}</Text>}
                 </>
@@ -136,7 +110,7 @@ const SignUpScreen = ({ navigation }) => {
             <Controller
               control={control}
               name="phone"
-              rules={{ required: false }}
+              rules={{ required: 'Phone number is required' }}
               render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
                 <>
                   <TextInput
@@ -147,56 +121,7 @@ const SignUpScreen = ({ navigation }) => {
                     placeholder="+91 98765 43210"
                     placeholderTextColor="#A9A9A9"
                     keyboardType="phone-pad"
-                  />
-                  {error && <Text style={styles.errorText}>{error.message}</Text>}
-                </>
-              )}
-            />
-          </View>
-
-          <View style={styles.fieldBlock}>
-            <Text style={styles.label}>EMAIL ADDRESS</Text>
-            <Controller
-              control={control}
-              name="email"
-              rules={{
-                required: false,
-                pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Invalid email address' },
-              }}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <>
-                  <TextInput
-                    style={[styles.input, error && styles.inputError]}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                    placeholder="partner@company.com"
-                    placeholderTextColor="#A9A9A9"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  {error && <Text style={styles.errorText}>{error.message}</Text>}
-                </>
-              )}
-            />
-          </View>
-
-          <View style={styles.fieldBlock}>
-            <Text style={styles.label}>PASSWORD</Text>
-            <Controller
-              control={control}
-              name="password"
-              rules={{ required: false, minLength: { value: 6, message: 'Password must be at least 6 characters' } }}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <>
-                  <TextInput
-                    style={[styles.input, error && styles.inputError]}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                    placeholder="••••••••"
-                    placeholderTextColor="#A9A9A9"
-                    secureTextEntry
+                    autoComplete="tel"
                   />
                   {error && <Text style={styles.errorText}>{error.message}</Text>}
                 </>
@@ -209,7 +134,7 @@ const SignUpScreen = ({ navigation }) => {
             onPress={handleSubmit(handleFormSubmit)}
             disabled={loading}
           >
-            <Text style={styles.submitBtnText}>{loading ? 'PROCESSING...' : 'SIGN UP'}</Text>
+            <Text style={styles.submitBtnText}>{loading ? 'SENDING OTP...' : 'SIGN UP WITH OTP'}</Text>
           </TouchableOpacity>
 
           <Text style={styles.footerPrompt}>
@@ -292,24 +217,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 12,
     marginBottom: 32,
-  },
-  methodBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: groceryTheme.radius.md,
-    backgroundColor: groceryTheme.colors.surfaceContainerHighest,
-    alignItems: 'center',
-  },
-  methodBtnActive: {
-    backgroundColor: groceryTheme.colors.primary,
-  },
-  methodText: {
-    color: groceryTheme.colors.textSecondary,
-    fontSize: 14,
-  },
-  methodTextActive: {
-    color: groceryTheme.colors.onPrimary,
-    fontWeight: '700',
   },
   submitBtnDisabled: {
     opacity: 0.6,

@@ -31,10 +31,10 @@ const MainNavigator = () => {
           gestureEnabled: false,
           animation: "none",
         }}
-        initialRouteName="HomeScreen"
+        initialRouteName="SplashScreen"
       >
-        <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="SplashScreen" component={SplashScreen} />
+        <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="SignInScreen" component={SignInScreen} />
         <Stack.Screen name="SignUpScreen" component={SignUpScreen} />
         <Stack.Screen name="VerificationScreen" component={VerificationScreen} />

@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   tabTextActive: {
-    color: groceryTheme.colors.onPrimary,
+    color: groceryTheme.colors.inverse,
   },
   content: {
     paddingHorizontal: 16,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     ...groceryTheme.typography.labelMd,
-    color: groceryTheme.colors.onPrimary,
+    color: groceryTheme.colors.inverse,
     letterSpacing: 1,
   },
   promoBanner: {
