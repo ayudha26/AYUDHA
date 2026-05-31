@@ -90,7 +90,7 @@ select
   0.00,
   '50Kg',
   c.id,
-  'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/ACC%20SURAKSHA.JPG',
+  'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/ACC%20Suraksha.png',
   0,
   'acc-suraksha'
 from categories c
@@ -129,4 +129,3 @@ where c.name = 'Cement & Concrete'
 limit 1;
 
 -- Done
-

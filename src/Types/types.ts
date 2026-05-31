@@ -51,6 +51,8 @@ export interface FormField {
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoComplete?: 'off' | 'email' | 'password' | 'name' | 'tel';
+  maxLength?: number;
+  sanitizeInput?: (value: string) => string;
 }
   
 export interface ForgotPasswordForm {

@@ -13,6 +13,8 @@ interface FormField {
   keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoComplete?: 'off' | 'email' | 'password' | 'name' | 'tel';
+  maxLength?: number;
+  sanitizeInput?: (value: string) => string;
 }
 
 export interface CustomFormProps {
@@ -49,7 +51,7 @@ const CustomForm = ({
                     error && styles.inputError
                   ]}
                   onBlur={onBlur}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(field.sanitizeInput ? field.sanitizeInput(text) : text)}
                   value={value}
                   placeholder={field.placeholder}
                   placeholderTextColor={groceryTheme.colors.textMuted}
@@ -57,6 +59,7 @@ const CustomForm = ({
                   keyboardType={field.keyboardType}
                   autoCapitalize={field.autoCapitalize}
                   autoComplete={field.autoComplete}
+                  maxLength={field.maxLength}
                 />
                 {error && (
                   <Text style={styles.errorText}>

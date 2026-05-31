@@ -5,6 +5,7 @@ import { FormData } from '../Types/types';
 import supabase, { isSupabaseConfigured } from '@config/supabase';
 import { groceryTheme } from '@src/Utils/groceryTheme';
 import ScreenHeader from '@components/Layouts/ScreenHeader';
+import { formatIndianPhoneInput, getOtpSendErrorMessage, normalizePhoneForOtp } from '@src/Utils/phoneAuth';
 
 const SignUpScreen = ({ navigation }) => {
   const { control, handleSubmit } = useForm<FormData>({
@@ -34,20 +35,25 @@ const SignUpScreen = ({ navigation }) => {
       }
 
       const userName = data.userName?.trim();
-      const phone = data.phone?.trim();
+      const phone = normalizePhoneForOtp(data.phone);
 
       if (!userName) {
         Alert.alert('Name required', 'Please enter your name to create your account.');
         return;
       }
 
-      if (!phone) {
-        Alert.alert('Phone required', 'Please enter your phone number to sign up with SMS.');
-        return;
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          data: {
+            full_name: userName,
+            phone,
+          },
+        },
+      });
+      if (otpError) {
+        throw new Error(getOtpSendErrorMessage(otpError, phone));
       }
-
-      const { error: otpError } = await supabase.auth.signInWithOtp({ phone });
-      if (otpError) throw otpError;
       navigation.navigate('VerificationScreen', {
         phone,
         userName,
@@ -77,7 +83,7 @@ const SignUpScreen = ({ navigation }) => {
           <View style={styles.headerBlock}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
-              Enter your details and we&apos;ll send a one-time code to verify your phone number.
+              Enter your details and 10-digit mobile number. We&apos;ll automatically use the India country code (+91) for OTP verification.
             </Text>
           </View>
 
@@ -106,22 +112,33 @@ const SignUpScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.label}>PHONE NUMBER</Text>
+            <Text style={styles.label}>PHONE NUMBER (+91)</Text>
             <Controller
               control={control}
               name="phone"
-              rules={{ required: 'Phone number is required' }}
+              rules={{
+                required: 'Phone number is required',
+                validate: (value) => {
+                  try {
+                    normalizePhoneForOtp(value);
+                    return true;
+                  } catch (error) {
+                    return (error as Error).message;
+                  }
+                },
+              }}
               render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
                 <>
                   <TextInput
                     style={[styles.input, error && styles.inputError]}
                     onBlur={onBlur}
-                    onChangeText={onChange}
+                    onChangeText={(value) => onChange(formatIndianPhoneInput(value))}
                     value={value}
-                    placeholder="+91 98765 43210"
+                    placeholder="98765 43210"
                     placeholderTextColor="#A9A9A9"
                     keyboardType="phone-pad"
                     autoComplete="tel"
+                    maxLength={11}
                   />
                   {error && <Text style={styles.errorText}>{error.message}</Text>}
                 </>

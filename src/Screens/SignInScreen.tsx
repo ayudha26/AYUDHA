@@ -6,6 +6,7 @@ import ScreenHeader from '@components/Layouts/ScreenHeader';
 import { FormData, FormField } from '../Types/types';
 import supabase, { isSupabaseConfigured } from '@config/supabase';
 import { groceryTheme } from '@src/Utils/groceryTheme';
+import { formatIndianPhoneInput, getOtpSendErrorMessage, normalizePhoneForOtp } from '@src/Utils/phoneAuth';
 
 const SignInScreen = ({ navigation }) => {
   const { control, handleSubmit } = useForm<FormData>({
@@ -32,16 +33,17 @@ const SignInScreen = ({ navigation }) => {
         throw new Error('Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to continue.');
       }
 
-      const phone = data.phone?.trim();
-
-      if (!phone) {
-        throw new Error('Please enter your phone number to continue.');
-      }
+      const phone = normalizePhoneForOtp(data.phone);
 
       const { error } = await supabase.auth.signInWithOtp({
         phone,
+        options: {
+          shouldCreateUser: false,
+        },
       });
-      if (error) throw error;
+      if (error) {
+        throw new Error(getOtpSendErrorMessage(error, phone));
+      }
 
       navigation.navigate('VerificationScreen', { phone, flow: 'phone_signin' });
     } catch (error) {
@@ -55,10 +57,22 @@ const SignInScreen = ({ navigation }) => {
     {
       name: 'phone',
       label: 'Phone',
-      placeholder: '+91 98765 43210',
-      rules: { required: 'Phone number is required' },
+      placeholder: '98765 43210',
+      rules: {
+        required: 'Phone number is required',
+        validate: (value: string) => {
+          try {
+            normalizePhoneForOtp(value);
+            return true;
+          } catch (error) {
+            return (error as Error).message;
+          }
+        },
+      },
       keyboardType: 'phone-pad',
       autoComplete: 'tel',
+      maxLength: 11,
+      sanitizeInput: formatIndianPhoneInput,
     },
   ];
 
@@ -77,7 +91,7 @@ const SignInScreen = ({ navigation }) => {
           <ScreenHeader title="Sign In" onBack={handleBack} />
           <View style={styles.formWrap}>
             <Text style={styles.helperText}>
-              Enter your phone number and we&apos;ll send you a one-time verification code.
+              Enter your 10-digit mobile number. We&apos;ll automatically use the India country code (+91) and send you a verification code.
             </Text>
             <CustomForm
               fields={formFields}

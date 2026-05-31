@@ -63,5 +63,5 @@ try {
   // ignore
 }
 
-export { isSupabaseConfigured };
+export { isSupabaseConfigured, supabaseKey, supabaseUrl };
 export default supabase

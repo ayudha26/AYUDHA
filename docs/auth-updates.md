@@ -26,8 +26,11 @@ This document explains the recent changes made to authentication flows, profile 
 1. Sign in to your Supabase project dashboard.
 2. Go to `Authentication` -> `Settings` -> `SMS` (or `SMS providers`) and configure a provider (Twilio is common).
    - For Twilio you will need `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and a `TWILIO_PHONE_NUMBER`.
+   - Also confirm phone signups are allowed for the project. If Supabase returns `signups not allowed for otp`, enable phone auth and new user signups in the dashboard before testing again.
+   - If Twilio returns error `21212 Invalid From Number (caller ID)`, first confirm the Twilio fields are mapped correctly: `MG...` belongs in the Message Service SID field, not a phone-number field. If that mapping is already correct, check the Twilio Messaging Service sender pool, SMS geo permissions for India, and trial-account recipient verification.
 3. After configuring SMS provider, test sending an OTP using the Supabase dashboard or SDK: `supabase.auth.signInWithOtp({ phone: '+91..' })`.
 4. Make sure you allow/whitelist any necessary numbers in Twilio (if sandboxing).
+5. Users do not need to type `+91` in the app. The mobile client collects a local Indian mobile number and automatically converts `10-digit`, `0XXXXXXXXXX`, and `91XXXXXXXXXX` inputs into E.164 `+91XXXXXXXXXX` before calling Supabase.
 
 Environment variables (Expo / .env):
 - EXPO_PUBLIC_SUPABASE_URL

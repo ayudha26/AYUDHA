@@ -13,6 +13,7 @@ if (!url || !key) {
 const supabase = createClient(url.trim(), key.trim());
 
 const updates = [
+  { nameLike: 'acc suraksha', url: 'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/ACC%20Suraksha.png' },
   { nameLike: 'mat chape', url: 'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/Mat%20chape.jpg' },
   { nameLike: 'civil wire mesh', url: 'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/Civil%20Wire%20Mesh.jpg' },
   { nameLike: 'priya', url: 'https://crgifantdhqwenqypgey.supabase.co/storage/v1/object/public/civil/Priya%20cement%20.JPG' },
