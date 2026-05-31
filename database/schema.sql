@@ -8,7 +8,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists profiles (
   id uuid primary key default uuid_generate_v4(),
   user_uuid uuid references auth.users(id) on delete cascade not null unique,
-  user_email text not null,
+  user_email text,
   full_name text,
   company_name text,
   phone text,
@@ -20,6 +20,7 @@ create table if not exists profiles (
 
 alter table profiles add column if not exists full_name text;
 alter table profiles add column if not exists avatar_url text;
+alter table profiles alter column user_email drop not null;
 
 -- Categories table
 create table if not exists categories (
